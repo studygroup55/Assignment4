@@ -43,13 +43,12 @@ for (i in combinations){
   color = append(color, substr(i, 5,5))
 }
 
-category = 
 
 
 data = data.frame(stimulus_number = unlist(stimulus), arms = unlist(arms), spots = unlist(spots), legs = unlist(legs), eyes = unlist(eyes), color = unlist(color))
 
 data <- data %>%
-  mutate(danger = ifelse(eyes == 1 & arms == 1, 1, 0), 
+  mutate(danger = ifelse(spots == 1 & eyes == 1, 1, 0), 
          stimulus_number = as.factor(stimulus_number),
          arms = as.numeric(arms),
          spots = as.numeric(spots), 
@@ -154,12 +153,14 @@ simulate_responses <- function(agent, w, c) {
     danger <- experiment$danger
     
     if (w == "equal") {
-        weight <- rep(1 / 2, 2)
-    } else if (w == "skewed1") {
-        weight <- c(0, 1)
-    } else if (w == "skewed2") {
-        weight <- c(0.1, 0.9)
-    }
+      weight <- rep(1 / 2, 2) 
+      } 
+    else if (w == "optimal" & (experiment$eyes == 1 | experiment$spots == 1)) {
+      weight <- rep(1, 2) 
+      }
+    else {
+      weight <- rep(0, 2) 
+      }
 
     # simulate responses
     responses <- gcm(
@@ -191,8 +192,8 @@ plan(multisession, workers = availableCores())
 param_df <- dplyr::tibble(
     expand_grid(
         agent = 1:10,
-        c = seq(.1, 2, 0.2),
-        w = c("equal", "skewed1", "skewed2")
+        c = c(0.2, 0.7, 1.2),
+        w = c("equal", "optimal")
     )
 )
 
@@ -201,4 +202,26 @@ simulated_responses <- future_pmap_dfr(param_df,
     .options = furrr_options(seed = TRUE)
 )
 ```
+
+
+Subset
+```{r}
+
+df_simulated_responses <- simulated_responses %>% 
+  subset(c == "0.9" & w == "skewed1")
+
+```
+
+
+
+```{r}
+
+ggplot(df_simulated_responses, aes(x = trial, y = performance, color = as.factor(agent))) +
+  geom_line ()+
+  facet_wrap(~ df_simulated_responses$agent) + 
+  labs(x = "Trial", y = "Performance", color = "Agent")
+
+
+```
+
 
