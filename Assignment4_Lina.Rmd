@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-pacman::p_load(furrr, purrr, tidyverse, tictoc)
+pacman::p_load(furrr, purrr, tidyverse, tictoc, R.utils)
 ```
 
 
@@ -18,19 +18,8 @@ pacman::p_load(furrr, purrr, tidyverse, tictoc)
 df <- read.delim("AlienData.txt", sep= ",")
 ```
 
-```{r}
-for (i in 1:32) {
-  binary <- paste0(sprintf("%05s", as.binary(i)), collapse="")
-  print(binary)
-}
-
-
-```
 
 ```{r}
-#install.packages("R.utils")
-#library(R.utils)
-#library()
 
 n <- 5
 combinations <- sapply(strsplit(intToBin(0:(2 ^ n - 1)), split = ""), paste0, collapse = "")
@@ -60,7 +49,13 @@ category =
 data = data.frame(stimulus_number = unlist(stimulus), arms = unlist(arms), spots = unlist(spots), legs = unlist(legs), eyes = unlist(eyes), color = unlist(color))
 
 experiment <- data %>%
-  mutate(danger = ifelse(eyes == 1 & arms == 1, 1, 0))
+  mutate(danger = ifelse(eyes == 1 & arms == 1, 1, 0), 
+         stimulus_number = as.factor(stimulus_number),
+         arms = as.numeric(arms),
+         spots = as.numeric(spots), 
+         legs = as.numeric(legs),
+         eyes = as.numeric(eyes), 
+         color = as.numeric(color))
 
 # shuffle the dataframe by rows
 
