@@ -48,7 +48,7 @@ category =
 
 data = data.frame(stimulus_number = unlist(stimulus), arms = unlist(arms), spots = unlist(spots), legs = unlist(legs), eyes = unlist(eyes), color = unlist(color))
 
-experiment <- data %>%
+data <- data %>%
   mutate(danger = ifelse(eyes == 1 & arms == 1, 1, 0), 
          stimulus_number = as.factor(stimulus_number),
          arms = as.numeric(arms),
@@ -60,14 +60,16 @@ experiment <- data %>%
 # shuffle the dataframe by rows
 
 set.seed(1993)
-shuffled_data = data[sample(1:nrow(data)), ]
+shuffled_data_1 = data[sample(1:nrow(data)), ]
 
 set.seed(1997)
-shuffled_data = data[sample(1:nrow(data)), ]
+shuffled_data_2 = data[sample(1:nrow(data)), ]
 
 set.seed(1999)
-shuffled_data = data[sample(1:nrow(data)), ]
+shuffled_data_3 = data[sample(1:nrow(data)), ]
 
+
+experiment <- rbind(shuffled_data_1, shuffled_data_2, shuffled_data_3)
 
 
 ```
