@@ -153,14 +153,12 @@ simulate_responses <- function(agent, w, c) {
     danger <- experiment$danger
     
     if (w == "equal") {
-      weight <- rep(1 / 2, 2) 
+      weight <- rep(0.2, 5) 
       } 
-    else if (w == "optimal" & (experiment$eyes == 1 | experiment$spots == 1)) {
-      weight <- rep(1, 2) 
-      }
-    else {
-      weight <- rep(0, 2) 
-      }
+    else if (w == "optimal") {
+        weight <- c(0, 0.5, 0.5, 0, 0) 
+        }
+
 
     # simulate responses
     responses <- gcm(
@@ -208,7 +206,7 @@ Subset
 ```{r}
 
 df_simulated_responses <- simulated_responses %>% 
-  subset(c == "0.9" & w == "skewed1")
+  subset(c == "0.7" & w == "optimal")
 
 ```
 
