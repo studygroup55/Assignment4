@@ -1,0 +1,270 @@
+---
+title: "Assignment_4_Eva"
+author: "Eva Sahlholdt"
+date: "2023-05-02"
+output: html_document
+---
+
+```{r}
+pacman::p_load(furrr, purrr, tidyverse, tictoc, R.utils, cmdstanr)
+```
+
+**Create data** 
+
+```{r}
+
+#Define number of featues
+n <- 5
+
+#Define possible combinations of features
+combinations <- sapply(strsplit(intToBin(0:(2 ^ n - 1)), split = ""), paste0, collapse = "")
+
+#Create empty lists for stimulus and features
+stimulus <- list()
+arms = list()
+spots = list()
+legs = list()
+eyes = list()
+color = list()
+
+k = 0
+
+#Loop through combinations
+for (i in combinations){
+  k = k + 1
+  stimulus = append(stimulus, k)
+  arms = append(arms, substr(i, 1,1))
+  spots = append(spots, substr(i, 2,2))
+  legs = append(legs, substr(i, 3,3))
+  eyes = append(eyes, substr(i, 4,4))
+  color = append(color, substr(i, 5,5))
+}
+
+
+#Convert to dataframe
+data = data.frame(stimulus_number = unlist(stimulus), arms = unlist(arms), spots = unlist(spots), legs = unlist(legs), eyes = unlist(eyes), color = unlist(color))
+
+#Create the category (danger = 1, no danger = 0) depending on certain features
+data <- data %>%
+  mutate(danger = ifelse(spots == 1 & eyes == 1, 1, 0), 
+         stimulus_number = as.factor(stimulus_number),
+         arms = as.numeric(arms),
+         spots = as.numeric(spots), 
+         legs = as.numeric(legs),
+         eyes = as.numeric(eyes), 
+         color = as.numeric(color))
+
+#Create three datasets shuffled by rows
+set.seed(1993)
+shuffled_data_1 = data[sample(1:nrow(data)), ]
+
+set.seed(1997)
+shuffled_data_2 = data[sample(1:nrow(data)), ]
+
+set.seed(1999)
+shuffled_data_3 = data[sample(1:nrow(data)), ]
+
+#Combine shuffled datasets
+experiment <- rbind(shuffled_data_1, shuffled_data_2, shuffled_data_3)
+
+```
+
+
+```{r}
+#Defining similarity and distance
+
+# Distance 
+distance <- function(vect1, vect2, w) {
+  return(sum(w * abs(vect1 - vect2)))
+}
+
+# Similarity
+similarity <- function(distance, c) {
+  return(exp(-c * distance))
+}
+
+```
+
+
+**GCM**
+
+```{r}
+#Define model
+
+gcm <- function(w, c, obs, cat_one, quiet = TRUE) {
+  # create an empty list to save probability of saying "1" for each trial
+  r <- c()
+  
+  ntrials <- nrow(obs)
+  
+  for (i in 1:ntrials) {
+    # If quiet is FALSE, print every ten trials
+    if (!quiet && i %% 10 == 0) {
+      print(paste("i =", i))
+    }
+    # if this is the first trial, or there any category with no exemplars seen yet, set the choice to random
+    if (i == 1 || sum(cat_one[1:(i - 1)]) == 0 || sum(cat_one[1:(i - 1)]) == (i - 1)) {
+      r <- c(r, .5)
+    } else {
+      similarities <- c()
+      # for each previously seen stimulus assess distance and similarity
+      for (e in 1:(i - 1)) {
+        sim <- similarity(distance(obs[i, ], obs[e, ], w), c)
+        similarities <- c(similarities, sim)
+      }
+      # Calculate prob of saying "1" by dividing similarity to 1 by the sum of similarity to 1 and to 2
+      numerator <- 0.5 * sum(similarities[cat_one[1:(i - 1)] == 1])
+      denominator <- 0.5 * sum(similarities[cat_one[1:(i - 1)] == 1]) + 0.5 * sum(similarities[cat_one[1:(i - 1)] == 0])
+      r <- c(r, numerator / denominator)
+    }
+  }
+
+  return(rbinom(ntrials, 1, r))
+}
+
+```
+
+```{r}
+#Function for simulating responses
+
+simulate_responses <- function(agent, w, c) {
+    
+    observations <- experiment %>%
+        select(c("arms", "spots", "eyes", "legs", "color"))
+    
+    danger <- experiment$danger
+    
+    #create weights
+    if (w == "equal") { #equal weights for all features
+        weight <- rep(0.2, 5)
+    } else if (w == "optimal") { #only weighting the relevant features (spots and eyes)
+        weight <- c(0,0.5,0,5,0,0)
+    }
+
+    # simulate responses
+    responses <- gcm(
+        weight,
+        c,
+        observations,
+        danger)
+    
+    tmp_simulated_responses <- experiment %>%
+        mutate(
+            trial = seq(nrow(experiment)),
+            sim_response = responses,
+            correct = ifelse(danger == sim_response, 1, 0),
+            performance = cumsum(correct) / seq_along(correct),
+            c = c,
+            w = w,
+            agent = agent
+        )
+
+    return(tmp_simulated_responses)
+}
+
+```
+
+
+```{r}
+#Simulate responses for ten agents
+plan(multisession, workers = availableCores())
+
+param_df <- dplyr::tibble(
+    expand_grid(
+        agent = 1:10,
+        c = c(0.2, 0.7, 1.2), #sensitivity 
+        w = c("equal", "optimal") #weights
+    )
+)
+
+simulated_responses <- future_pmap_dfr(param_df,
+    simulate_responses,
+    .options = furrr_options(seed = TRUE)
+)
+```
+
+
+**Subset and plot**
+```{r}
+
+df_simulated_responses <- simulated_responses %>% 
+  subset(c == "0.7" & w == "optimal")
+
+```
+
+```{r}
+
+ggplot(df_simulated_responses, aes(x = trial, y = performance, color = as.factor(agent))) +
+  geom_line () +
+  #facet_wrap(~ df_simulated_responses$agent) + 
+  labs(x = "Trial", y = "Performance", color = "Agent")
+
+```
+
+
+**Fit Stan** 
+
+```{r}
+n_agents = 2
+
+for (i in 1:n_agents) {
+  d <- simulated_responses %>% subset(c == "0.7" & w == "optimal")
+  
+  gcm_data <- list(
+    ntrials = nrow(d),
+    nfeatures = 5,
+    cat_one = d$danger, # "true responses on a trial by trial basis"
+    y = d$sim_response,
+    obs = as.matrix(d[, c("arms", "spots", "eyes", "legs", "color")]),
+    b = 0.5,
+    w_prior_values = c(1, 1, 1, 1, 1),
+    c_prior_values = c(0, 1)
+  )
+    
+  mod_GCM <- cmdstan_model("gcm.stan", cpp_options = list(stan_threads = TRUE), stanc_options = list("O1"))
+    
+  samples <- mod_GCM$sample(
+    data = gcm_data, # the data :-)
+    seed = 123,  # a seed, so I always get the same results
+    chains = 1,  # how many chains should I fit (to check whether they give the same results)                   ##NB!!! testing with 1 (normal 2)
+    parallel_chains = 2, # how many of the chains can be run in parallel?
+    threads_per_chain = 4, # distribute gradient estimations within chain across multiple cores                 ##NB!! testing with 4 (normal 2)
+    iter_warmup = 1000,  # warmup iterations through which hyperparameters (steps and step length) are adjusted
+    iter_sampling = 2000, # total number of iterations
+    refresh = 10,  # how often to show that iterations have been run
+    max_treedepth = 20, # how many steps in the future to check to avoid u-turns
+    adapt_delta = 0.99, # how high a learning rate to adjust hyperparameters during warmup
+  )
+  
+  #Disabling scientific notation
+  options(scipen=999)
+    
+  #extract summary 
+  samples$summary()
+  
+  # assign function within loop
+  #assign(paste0("weighted_summary_ID_", i), samples$summary())
+}
+```
+
+
+```{r}
+#Checking the data used in the model
+d <- simulated_responses %>% subset(c == "0.7" & w == "optimal")
+  
+  gcm_data <- list(
+    ntrials = nrow(d),
+    nfeatures = 5,
+    cat_one = d$danger, # "true responses on a trial by trial basis"
+    y = d$sim_response,
+    obs = as.matrix(d[, c("arms", "spots", "eyes", "legs", "color")]),
+    b = 0.5,
+    w_prior_values = c(1, 1, 1, 1, 1),
+    c_prior_values = c(0, 1)
+  )
+  
+gcm_data
+
+```
+
+
