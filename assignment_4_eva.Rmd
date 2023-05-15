@@ -7,6 +7,7 @@ output: html_document
 
 ```{r}
 pacman::p_load(furrr, purrr, tidyverse, tictoc, R.utils, cmdstanr)
+pacman::p_load("rstan", "tidyverse", "reshape2", "ggdag", "cmdstanr", "posterior", "brms")
 ```
 
 **Create data** 
@@ -138,7 +139,7 @@ simulate_responses <- function(agent, w, c) {
     if (w == "equal") { #equal weights for all features
         weight <- rep(0.2, 5)
     } else if (w == "optimal") { #only weighting the relevant features (spots and eyes)
-        weight <- c(0,0.5,0,5,0,0)
+        weight <- c(0,0.5,0.5,0,0)
     }
 
     # simulate responses
@@ -193,6 +194,13 @@ df_simulated_responses <- simulated_responses %>%
 ```
 
 ```{r}
+df_simulated_responses
+```
+
+
+
+
+```{r}
 
 ggplot(df_simulated_responses, aes(x = trial, y = performance, color = as.factor(agent))) +
   geom_line () +
@@ -204,11 +212,12 @@ ggplot(df_simulated_responses, aes(x = trial, y = performance, color = as.factor
 
 **Fit Stan** 
 
+**OPTIMAL 0.7**
 ```{r}
-n_agents = 2
+n_agents = 1
 
 for (i in 1:n_agents) {
-  d <- simulated_responses %>% subset(c == "0.7" & w == "optimal")
+  d <- simulated_responses %>% subset(c == "0.7" & w == "optimal" & agent == 3) #& agent == i
   
   gcm_data <- list(
     ntrials = nrow(d),
@@ -223,34 +232,40 @@ for (i in 1:n_agents) {
     
   mod_GCM <- cmdstan_model("gcm.stan", cpp_options = list(stan_threads = TRUE), stanc_options = list("O1"))
     
-  samples <- mod_GCM$sample(
+  samples_optimal_0.7 <- mod_GCM$sample(
     data = gcm_data, # the data :-)
     seed = 123,  # a seed, so I always get the same results
-    chains = 1,  # how many chains should I fit (to check whether they give the same results)                   ##NB!!! testing with 1 (normal 2)
-    parallel_chains = 2, # how many of the chains can be run in parallel?
-    threads_per_chain = 4, # distribute gradient estimations within chain across multiple cores                 ##NB!! testing with 4 (normal 2)
+    chains = 2,  # how many chains should I fit (to check whether they give the same results)
+    parallel_chains = 1, # how many of the chains can be run in parallel?                                       ##NB!!! Normal 2
+    threads_per_chain = 4, # distribute gradient estimations within chain across multiple cores
     iter_warmup = 1000,  # warmup iterations through which hyperparameters (steps and step length) are adjusted
-    iter_sampling = 2000, # total number of iterations
-    refresh = 10,  # how often to show that iterations have been run
+    iter_sampling = 1000, # total number of iterations                                                          ##NB!!! Normal 2000
+    refresh = 100,  # how often to show that iterations have been run
     max_treedepth = 20, # how many steps in the future to check to avoid u-turns
     adapt_delta = 0.99, # how high a learning rate to adjust hyperparameters during warmup
   )
   
   #Disabling scientific notation
-  options(scipen=999)
+  #options(scipen=999)
     
   #extract summary 
-  samples$summary()
+  #samples$summary()
   
   # assign function within loop
   #assign(paste0("weighted_summary_ID_", i), samples$summary())
 }
+
+#samples$cmdstan_diagnose()
+samples_optimal_0.7_summary <-samples_optimal_0.7$summary()
 ```
 
 
+**EQUAL 1.2**
 ```{r}
-#Checking the data used in the model
-d <- simulated_responses %>% subset(c == "0.7" & w == "optimal")
+n_agents = 1
+
+for (i in 1:n_agents) {
+  d <- simulated_responses %>% subset(c == "1.2" & w == "equal" & agent == 3) #& agent == i
   
   gcm_data <- list(
     ntrials = nrow(d),
@@ -262,9 +277,210 @@ d <- simulated_responses %>% subset(c == "0.7" & w == "optimal")
     w_prior_values = c(1, 1, 1, 1, 1),
     c_prior_values = c(0, 1)
   )
+    
+  mod_GCM <- cmdstan_model("gcm.stan", cpp_options = list(stan_threads = TRUE), stanc_options = list("O1"))
+    
+  samples_equal_1.2 <- mod_GCM$sample(
+    data = gcm_data, # the data :-)
+    seed = 123,  # a seed, so I always get the same results
+    chains = 2,  # how many chains should I fit (to check whether they give the same results)
+    parallel_chains = 1, # how many of the chains can be run in parallel?                                       ##NB!!! Normal 2
+    threads_per_chain = 4, # distribute gradient estimations within chain across multiple cores
+    iter_warmup = 1000,  # warmup iterations through which hyperparameters (steps and step length) are adjusted
+    iter_sampling = 1000, # total number of iterations                                                          ##NB!!! Normal 2000
+    refresh = 500,  # how often to show that iterations have been run
+    max_treedepth = 20, # how many steps in the future to check to avoid u-turns
+    adapt_delta = 0.99, # how high a learning rate to adjust hyperparameters during warmup
+  )
   
-gcm_data
+  #Disabling scientific notation
+  #options(scipen=999)
+    
+  #extract summary 
+  #3samples$summary()
+  
+  # assign function within loop
+  #assign(paste0("weighted_summary_ID_", i), samples$summary())
+}
+
+#samples_equal_1.2$cmdstan_diagnose()
+samples_equal_1.2_summary <- samples_equal_1.2$summary()
+
+
 
 ```
+
+
+
+```{r}
+n_agents = 1
+
+for (i in 1:n_agents) {
+  d <- simulated_responses %>% subset(c == "0.2" & w == "optimal" & agent == 3) #& agent == i
+  
+  gcm_data <- list(
+    ntrials = nrow(d),
+    nfeatures = 5,
+    cat_one = d$danger, # "true responses on a trial by trial basis"
+    y = d$sim_response,
+    obs = as.matrix(d[, c("arms", "spots", "eyes", "legs", "color")]),
+    b = 0.5,
+    w_prior_values = c(1, 1, 1, 1, 1),
+    c_prior_values = c(0, 1)
+  )
+    
+  mod_GCM <- cmdstan_model("gcm.stan", cpp_options = list(stan_threads = TRUE), stanc_options = list("O1"))
+    
+  samples_optimal_0.2 <- mod_GCM$sample(
+    data = gcm_data, # the data :-)
+    seed = 123,  # a seed, so I always get the same results
+    chains = 2,  # how many chains should I fit (to check whether they give the same results)
+    parallel_chains = 1, # how many of the chains can be run in parallel?                                       ##NB!!! Normal 2
+    threads_per_chain = 4, # distribute gradient estimations within chain across multiple cores
+    iter_warmup = 1000,  # warmup iterations through which hyperparameters (steps and step length) are adjusted
+    iter_sampling = 1000, # total number of iterations                                                          ##NB!!! Normal 2000
+    refresh = 500,  # how often to show that iterations have been run
+    max_treedepth = 20, # how many steps in the future to check to avoid u-turns
+    adapt_delta = 0.99, # how high a learning rate to adjust hyperparameters during warmup
+  )
+  
+  #Disabling scientific notation
+  #options(scipen=999)
+    
+  #extract summary 
+  #3samples$summary()
+  
+  # assign function within loop
+  #assign(paste0("weighted_summary_ID_", i), samples$summary())
+}
+
+#samples_equal_1.2$cmdstan_diagnose()
+samples_optimal_0.2_summary <- samples_optimal_0.2$summary()
+```
+
+**
+
+```{r}
+draws_df_optimal_0.7 <- as_draws_df(samples_optimal_0.7$draws())
+draws_df_equal_1.2 <- as_draws_df(samples_equal_1.2$draws())
+draws_df_optimal_0.2 <- as_draws_df(samples_optimal_0.2$draws())
+
+```
+
+
+```{r}
+samples_optimal_0.7
+draws_df_optimal_0.7
+
+ggplot(draws_df_optimal_0.7) +
+  geom_density(aes(c), fill = "blue", alpha = 0.3) +
+  geom_density(aes(c_prior), fill = "red", alpha = 0.3) +
+  #geom_vline(xintercept = 0.2, linetype = "dashed", color = "black", size = 1.5) +
+  xlab("C_0.7") +
+  ylab("Posterior Density") +
+  theme_classic()
+```
+
+
+
+```{r}
+plan(multisession, workers = availableCores())
+
+sim_d_and_fit <- function(agent, scaling, weights) {
+  
+    temp <- simulated_responses %>% subset(
+      c == scaling & w == weights & agent == agent
+      )
+    
+    data <- list(
+      ntrials = nrow(temp),
+      nfeatures = 2,
+      cat_one = temp$category,
+      y = temp$sim_response,
+      obs = as.matrix(temp[, c("height", "position")]),
+      b = 0.5,
+      w_prior_values = c(1, 1),
+      c_prior_values = c(0, 1)
+    )
+    
+    samples_gcm <- mod_GCM$sample(
+      data = data,
+      seed = 123,
+      chains = 1,
+      parallel_chains = 1,
+      threads_per_chain = 4,
+      iter_warmup = 1000,
+      iter_sampling = 1000,
+      refresh = 500
+    )
+    
+    draws_df <- as_draws_df(samples_gcm$draws()) 
+    temp <- tibble(trueC = scaling, trueW = weights, agent = agent,
+                   estC = draws_df$c, 
+                   estW1 = draws_df$`w[1]`,
+                   estW2 = draws_df$`w[2]`
+                   )
+    
+    return(temp)
+  
+}
+
+
+temp <- tibble(unique(simulated_responses[,c("agent", "c", "w")])) %>%
+  rename(
+    scaling = c,
+    weights = w
+  )
+
+recovery_df <- future_pmap_dfr(temp, sim_d_and_fit, .options = furrr_options(seed = TRUE))
+
+write_csv(recovery_df, "simdata/W10_GCM_recoverydf.csv")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
