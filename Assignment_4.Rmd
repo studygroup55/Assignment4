@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r}
-pacman::p_load("furrr", "purrr", "tidyverse", "tictoc", "R.utils", "cmdstanr", "rstan", "posterior", "brms")
+pacman::p_load("furrr", "purrr", "tidyverse", "tictoc", "R.utils", "cmdstanr", "rstan", "posterior", "brms", "patchwork")
 
 ```
 
@@ -347,7 +347,7 @@ subjectlist <- unique(df$subject)
 df <- df %>% 
   mutate(response_2 = ifelse(response == 1 | response == 2, 0, 1),
          category_2 = ifelse(category == 1 | category == 2, 0, 1), 
-         correct_2 = ifelse(category == response, 1, 0)
+         correct_2 = ifelse(category_2 == response_2, 1, 0)
          )
 
 
@@ -393,12 +393,149 @@ for (i in 1:length(subjectlist)) {
   #extract summary 
   samples$summary()
   
+  draws_df <- as_draws_df(samples$draws())
+  
+  draws_df <- draws_df %>% 
+  rename (w_1 = "w[1]",
+         w_prior_1 = "w_prior[1]",
+         w_2 = "w[2]",
+         w_prior_2 = "w_prior[2]",
+         w_3 = "w[3]",
+         w_prior_3 = "w_prior[3]",
+         w_4 = "w[4]",
+         w_prior_4 = "w_prior[4]",
+         w_5 = "w[5]",
+         w_prior_5 = "w_prior[5]")
+  
+  plot = ggplot(draws_df) +
+  geom_density(aes(w_1), fill = "yellow", alpha = 0.3) +
+  geom_density(aes(w_2), fill = "orange", alpha = 0.3) + 
+  geom_density(aes(w_3), fill = "green", alpha = 0.3) +
+  geom_density(aes(w_4), fill = "purple", alpha = 0.3) + 
+  geom_density(aes(w_5), fill = "cyan", alpha = 0.3) + 
+  geom_density(aes(w_prior_1), color = "red") +
+  xlab("Estimated weights") +
+  ylab("Posterior Density") +
+  ggtitle("Empirical data") +
+  xlim(0, 1) +
+  ylim(0, 15) +
+  theme_classic()
+  
+  
   # assign function within loop
-  #assign(paste0("weighted_summary_ID_", i), samples$summary())
+  assign(paste0("plot", i), plot)
+  
 }
+```
+```{r}
+# Checking the model's chains (noise)
+chains = ggplot(draws_df, aes(.iteration, w_5, group = .chain, color = .chain)) +
+  geom_line() +
+  theme_classic() +
+  ggtitle("Estimated weight for color") 
+  
+
+
 ```
 
 
+```{r}
+draws_df_empirical<- as_draws_df(samples$draws())
+
+
+draws_df_empirical <- draws_df_empirical %>% 
+  rename (w_1 = "w[1]",
+         w_prior_1 = "w_prior[1]",
+         w_2 = "w[2]",
+         w_prior_2 = "w_prior[2]",
+         w_3 = "w[3]",
+         w_prior_3 = "w_prior[3]",
+         w_4 = "w[4]",
+         w_prior_4 = "w_prior[4]",
+         w_5 = "w[5]",
+         w_prior_5 = "w_prior[5]")
+
+
+
+
+#samples$summary()
+
+ggplot(draws_df_empirical) +
+  geom_density(aes(w_1), fill = "blue", alpha = 0.3) +
+  geom_density(aes(w_prior_1), fill = "red", alpha = 0.3) +
+  geom_vline(xintercept = 0.5, linetype = "dashed", color = "black", size = 1.5) +
+  xlab("Weight 1 = 0.5") +
+  ylab("Posterior Density") +
+  ggtitle("C = 2.2") +
+  xlim(0,1) +
+  ylim(0,12) +
+  theme_classic()
+
+
+ggplot(draws_df_empirical) +
+  geom_density(aes(w_2), fill = "blue", alpha = 0.3) +
+  geom_density(aes(w_prior_2), fill = "red", alpha = 0.3) + 
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", size = 1.5) +
+  xlab("Weight 2 = 0") +
+  ylab("Posterior Density") +
+  ggtitle("C = 2.2") +
+  xlim(0, 1) +
+  ylim(0, 12) +
+  theme_classic()
+
+
+ggplot(draws_df_empirical) +
+  geom_density(aes(w_3), fill = "blue", alpha = 0.3) +
+  geom_density(aes(w_prior_3), fill = "red", alpha = 0.3) + 
+  geom_vline(xintercept = 0.5, linetype = "dashed", color = "black", size = 1.5) +
+  xlab("Weight 3 = 0.5") +
+  ylab("Posterior Density") +
+  ggtitle("C = 2.2") +
+  xlim(0, 1) +
+  ylim(0, 12) +
+  theme_classic()
+
+ggplot(draws_df_empirical) +
+  geom_density(aes(w_4), fill = "blue", alpha = 0.3) +
+  geom_density(aes(w_prior_4), fill = "red", alpha = 0.3) + 
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", size = 1.5) +
+  xlab("Weight 4 = 0") +
+  ylab("Posterior Density") +
+  ggtitle("C = 2.2") +
+  xlim(0, 1) +
+  ylim(0, 12) +
+  theme_classic()
+
+ggplot(draws_df_empirical) +
+  geom_density(aes(w_5), fill = "blue", alpha = 0.3) +
+  geom_density(aes(w_prior_5), fill = "red", alpha = 0.3) + 
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", size = 1.5) +
+  xlab("Weight 5 = 0") +
+  ylab("Posterior Density") +
+  ggtitle("C = 2.2") +
+  xlim(0, 1) +
+  ylim(0, 12) +
+  theme_classic()
+
+
+
+ggplot(draws_df_empirical) +
+  geom_density(aes(w_1), fill = "yellow", alpha = 0.3) +
+  geom_density(aes(w_2), fill = "orange", alpha = 0.3) + 
+  geom_density(aes(w_3), fill = "green", alpha = 0.3) +
+  geom_density(aes(w_4), fill = "purple", alpha = 0.3) + 
+  geom_density(aes(w_5), fill = "cyan", alpha = 0.3) + 
+  geom_density(aes(w_prior_1), color = "red") +
+  xlab("Estimated weights") +
+  ylab("Posterior Density") +
+  ggtitle("Empirical data") +
+  xlim(0, 1) +
+  ylim(0, 12) +
+  theme_classic()
+  
+
+
+```
 
 
 
@@ -422,5 +559,23 @@ df_2 <- df %>% subset(subject == 1 & session == 1 & condition == 1)
   
   
   gcm_data
+  
+  subject1
+```
+
+```{r}
+(plot1 + plot2 + plot3)/(plot4 + plot5 + plot6)
+
+(plot7 +plot8+plot9)/(plot10+plot11 + plot12)
+
+(plot13 + plot14+plot15)/(plot16+plot17 + plot18)
+
+(plot19 + plot20+plot21)
+
+(plot22+plot23 + plot24)/(plot25 + plot26 + plot27)
+
+
+
+(chains_w_1 + chains_w_2)/(chains_w_3 + chains_w_4)/(chains_w_5 + chains_w_1)
 ```
 
