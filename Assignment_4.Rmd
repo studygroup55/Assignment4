@@ -206,10 +206,10 @@ ggplot(df_simulated_responses, aes(x = trial, y = performance, color = as.factor
 **Fit Stan** 
 
 ```{r}
-n_agents = 2
+n_agents = 1
 
 for (i in 1:n_agents) {
-  d <- simulated_responses %>% subset(c == "1.2" & w == "optimal" & agent == 1)
+  d <- simulated_responses %>% subset(c == "1.7" & w == "optimal" & agent == 1)
   
   gcm_data <- list(
     ntrials = nrow(d),
@@ -248,91 +248,179 @@ for (i in 1:n_agents) {
 }
 ```
 
+
 ```{r}
 
-samples_agent1_0.2_optimal <- samples
+draws_df_1.7 <- as_draws_df(samples$draws())
+
+
+draws_df_1.7 <- draws_df_1.7 %>% 
+  rename (w_1 = "w[1]",
+         w_prior_1 = "w_prior[1]")
+
+draws_df_1.7 <- draws_df_1.7 %>% 
+  rename (w_2 = "w[2]",
+         w_prior_2 = "w_prior[2]")
+
+#samples$summary()
+
+ggplot(draws_df_1.7) +
+  geom_density(aes(c), fill = "blue", alpha = 0.3) +
+  geom_density(aes(c_prior), fill = "red", alpha = 0.3) +
+  geom_vline(xintercept = 1.7, linetype = "dashed", color = "black", size = 1.5) +
+  xlab("C = 1.7") +
+  ylab("Posterior Density") +
+  theme_classic()
+
+
+#samples$summary()
+
+ggplot(draws_df_1.7) +
+  geom_density(aes(w_1), fill = "blue", alpha = 0.3) +
+  geom_density(aes(w_prior_1), fill = "red", alpha = 0.3) +
+  geom_vline(xintercept = 0.5, linetype = "dashed", color = "black", size = 1.5) +
+  xlab("Weight 1 = 0.5") +
+  ylab("Posterior Density") +
+  ggtitle("C = 1.7") +
+  xlim(0,1) +
+  ylim(0,8) +
+  theme_classic()
+
+
+ggplot(draws_df_1.7) +
+  geom_density(aes(w_2), fill = "blue", alpha = 0.3) +
+  geom_density(aes(w_prior_2), fill = "red", alpha = 0.3) + 
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", size = 1.5) +
+  xlab("Weight 2 = 0") +
+  ylab("Posterior Density") +
+  ggtitle("C = 1.7") +
+  xlim(0, 1) +
+  ylim(0, 8) +
+  theme_classic()
+
+
+ggplot(draws_df_1.7) +
+  geom_density(aes(w_1), fill = "orange", alpha = 0.3) +
+  geom_density(aes(w_2), fill = "green", alpha = 0.3) +
+  geom_density(aes(w_prior_1), color = "red") +
+  #geom_vline(xintercept = 0.2, linetype = "dashed", color = "black", size = 1.5) +
+  xlab("Weight 1 = 0.5 (orange), Weight 2 = 0 (green)") +
+  ylab("Posterior Density") +
+  ggtitle("C = 1.7") +
+  xlim(0,1)+
+  ylim(0,5)+
+  theme_classic()
 
 ```
 
 
 
 
+
+
+#Empirical data
+
 ```{r}
-#Checking the data used in the model
-d <- simulated_responses %>% subset(c == "0.7" & w == "optimal")
+df <- read.delim("AlienData.txt", sep= ",")
+```
+
+
+```{r}
+df <- df[!grepl("pt", df$stimulus), ]
+
+# code columns for each feature in empiral data
+df <- df %>% 
+  mutate(eyes = str_sub(stimulus, 1, 1)) %>% 
+  mutate(legs = str_sub(stimulus, 2, 2)) %>% 
+  mutate(spots = str_sub(stimulus, 3, 3)) %>% 
+  mutate(arms = str_sub(stimulus, 4, 4)) %>% 
+  mutate(color = str_sub(stimulus, 5, 5)) %>% 
+  filter(session == 1 & condition == 2)
+
+df <- df %>%
+  mutate_at(vars(-stimulus), as.numeric)
+
+subjectlist <- unique(df$subject)
+
+
+#Recoding to delete the nutritious dimension 
+df <- df %>% 
+  mutate(response_2 = ifelse(response == 1 | response == 2, 0, 1),
+         category_2 = ifelse(category == 1 | category == 2, 0, 1), 
+         correct_2 = ifelse(category == response, 1, 0)
+         )
+
+
+```
+
+
+```{r}
+
+for (i in 1:length(subjectlist)) {
+  
+  df_2 <- df %>% subset(subject == i)  
   
   gcm_data <- list(
-    ntrials = nrow(d),
+    ntrials = nrow(df_2),
     nfeatures = 5,
-    cat_one = d$danger, # "true responses on a trial by trial basis"
-    y = d$sim_response,
-    selected_cols = c("eyes", "legs", "spots", "arms", "color"),
-    obs = as.matrix(d[, selected_cols]),
+    cat_one = df_2$danger, # "true responses on a trial by trial basis"
+    y = df_2$response_2,
+    obs = as.matrix(df_2[, c("eyes", "legs", "spots", "arms", "color")]),
     b = 0.5,
+    c = 2.2,
     w_prior_values = c(1, 1, 1, 1, 1),
     c_prior_values = c(0, 1)
   )
-
+    
+  mod_GCM <- cmdstan_model("gcm_empirical.stan", cpp_options = list(stan_threads = TRUE), stanc_options = list("O1"))
+    
+  samples <- mod_GCM$sample(
+    data = gcm_data, # the data :-)
+    seed = 123,  # a seed, so I always get the same results
+    chains = 2,  # how many chains should I fit (to check whether they give the same results)                   ##NB!!! testing with 1 (normal 2)
+    parallel_chains = 2, # how many of the chains can be run in parallel?
+    threads_per_chain = 4, # distribute gradient estimations within chain across multiple cores                 ##NB!! testing with 4 (normal 2)
+    iter_warmup = 1000,  # warmup iterations through which hyperparameters (steps and step length) are adjusted
+    iter_sampling = 2000, # total number of iterations
+    refresh = 100,  # how often to show that iterations have been run
+    max_treedepth = 20, # how many steps in the future to check to avoid u-turns
+    adapt_delta = 0.99, # how high a learning rate to adjust hyperparameters during warmup
+  )
   
-
-length(gcm_data$obs)
-
-gcm_data
-
+  #Disabling scientific notation
+  options(scipen=999)
+    
+  #extract summary 
+  samples$summary()
+  
+  # assign function within loop
+  #assign(paste0("weighted_summary_ID_", i), samples$summary())
+}
 ```
 
 
+
+
+
 ```{r}
+df <- df[!grepl("pt", df$stimulus), ]
 
-draws_df_0.2 <- as_draws_df(samples_agent1_0.2_optimal$draws())
-
-#samples$summary()
-
-ggplot(draws_df_0.2) +
-  geom_density(aes(c), fill = "blue", alpha = 0.3) +
-  geom_density(aes(c_prior), fill = "red", alpha = 0.3) +
-  #geom_vline(xintercept = 0.2, linetype = "dashed", color = "black", size = 1.5) +
-  xlab("C_0.2") +
-  ylab("Posterior Density") +
-  theme_classic()
-
-
-draws_df_0.7 <- as_draws_df(samples_agent1_0.7_optimal$draws())
-
-#samples$summary()
-
-ggplot(draws_df_0.7) +
-  geom_density(aes(c), fill = "blue", alpha = 0.3) +
-  geom_density(aes(c_prior), fill = "red", alpha = 0.3) +
-  #geom_vline(xintercept = 0.2, linetype = "dashed", color = "black", size = 1.5) +
-  xlab("C_0.7") +
-  ylab("Posterior Density") +
-  theme_classic()
-
-
-draws_df_0.2 <- as_draws_df(samples_agent1_0.2_optimal$draws())
-
-draws_df_0.2 <- draws_df_0.2 %>% 
-  rename (w_1 = "w[1]",
-         w_prior_1 = "w_prior[1]")
-
-
-draws_df_0.7 <- draws_df_0.7 %>% 
-  rename (w_1 = "w[1]",
-         w_prior_1 = "w_prior[1]")
-
-draws_df_0.7
-
-#samples$summary()
-
-ggplot(draws_df_0.7) +
-  geom_density(aes(w_2), fill = "blue", alpha = 0.3) +
-  geom_density(aes(w_1), fill = "red", alpha = 0.3) +
-  #geom_vline(xintercept = 0.2, linetype = "dashed", color = "black", size = 1.5) +
-  xlab("Weight 2") +
-  ylab("Posterior Density") +
-  theme_classic()
-
-
+df_2 <- df %>% subset(subject == 1 & session == 1 & condition == 1)  
+ 
+  gcm_data <- list(
+    ntrials = nrow(df_2),
+    nfeatures = 5,
+    cat_one = df_2$danger, # "true responses on a trial by trial basis"
+    y = df_2$sim_response,
+    obs = as.matrix(df_2[, c("eyes", "legs", "spots", "arms", "color")]),
+    b = 0.5,
+    c = 2.2,
+    w_prior_values = c(1, 1, 1, 1, 1),
+    c_prior_values = c(0, 1)
+  )
+  
+  
+  
+  gcm_data
 ```
 
