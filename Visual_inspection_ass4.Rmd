@@ -36,49 +36,65 @@ df1 <- subset(df1, condition == "2")
 df1 <- as.data.frame(df1)
 
 
-unique(df1$cycle)
-
-# Further inspection
-length(unique(df$subject)) # 27 unique subjects in entire data frame
-length(unique(df1$subject)) # still 27 
-
-#Check for NAs
-NAs <- names(df1)[colSums(is.na(df1)) > 0]
-NAs #There are no NAs
-
-#Checking classes of all columns - and changing them to numeric - except the stimulus column
-sapply(df1, class) 
-
 df1 <- df1 %>%
   mutate_at(vars(-stimulus), as.numeric)
 
 sapply(df1, class)
 
+
+# Further inspection
+length(unique(df$subject)) # 27 unique subjects in entire data frame
+
+#Check for NAs
+NAs <- names(df1)[colSums(is.na(df1)) > 0]
+NAs #There are no NAs
+
+
+
 # There are some weird trials that should be removed
 df1 <- df1[!grepl("pt", df1$stimulus), ]
 
+# code columns for each feature in empiral data
+df1 <- df1 %>% 
+  mutate(eyes = str_sub(stimulus, 1, 1)) %>% 
+  mutate(legs = str_sub(stimulus, 2, 2)) %>% 
+  mutate(spots = str_sub(stimulus, 3, 3)) %>% 
+  mutate(arms = str_sub(stimulus, 4, 4)) %>% 
+  mutate(color = str_sub(stimulus, 5, 5))
 
-#df1$performance <- cumsum(df1$correct) / seq_along(df1$correct)
+
+
+#Recoding to delete the nutritious dimension 
+df1 <- df1 %>% 
+  mutate(response_2 = ifelse(response == 1 | response == 2, 0, 1),
+         category_2 = ifelse(category == 1 | category == 2, 0, 1), 
+         correct_2 = ifelse(category == response, 1, 0)
+         )
+
 
 df1 <- df1 %>%
   group_by(subject) %>%
-  mutate(performance = cumsum(correct) / seq_along(correct))
-
-?seq_along
+  mutate(performance = cumsum(correct_2) / seq_along(correct_2))
 ```
+
+
+
 
 # Visual exploration
 
 ```{r}
-# Create the bar plot with the reordered data frame
+# Create the bar plot with the original data frame
 barplot(table(df1$correct, df1$trial), 
         beside = TRUE, 
-        main = "Development of Responses Across Trials - Empirical Data", 
+        main = "Development of Responses Across Trials - Empirical Data",
         ylab = "Response Count",
         xaxt = "t",
         xlab = "Trial Number",
-        ylim = c(0,50),
+        ylim = c(0,30),
         border = NA)
+
+# Adjust the subtitle position
+title(sub = "Before recoding responses", line = -14.7)
 
 # Add a legend
 legend("middle right", 
@@ -91,11 +107,32 @@ legend("middle right",
 
 #table(df1$correct) # we see that there are more correct responses than incorrect ones
 
-```
 
+# Create the bar plot with the reordered data frame
+barplot(table(df1$correct_2, df1$trial), 
+        beside = TRUE, 
+        main = "Development of Responses Across Trials - Empirical Data",
+        ylab = "Response Count",
+        xaxt = "t",
+        xlab = "Trial Number",
+        ylim = c(0,30),
+        border = NA)
+
+# Adjust the subtitle position
+title(sub = "After recoding responses", line = -14.7)
+# Add a legend
+legend("middle right", 
+       legend = c("Correct", "Incorrect"), 
+       fill = c("light grey", "black"),
+       xpd = TRUE,
+       x = "right",
+       y = max(par("usr")[4], par("usr")[3]) + 0.5)
+
+```
+#Simulated Data
 ```{r}
 # Do it for the simulated data
-# Create the bar plot with the reordered data frame
+# Create the bar plot 
 barplot(table(simulated_responses$correct, simulated_responses$trial), 
         beside = TRUE, 
         main = "Development of Responses Across Trials - Simulated Data", 
@@ -105,8 +142,6 @@ barplot(table(simulated_responses$correct, simulated_responses$trial),
         ylim = c(0,75),
         border = NA)
 
-?facet_wrap
-
 # Add a legend
 legend("middle right", 
        legend = c("Correct", "Incorrect"), 
@@ -119,55 +154,13 @@ legend("middle right",
 #table(simulated_responses$correct) # we see that there are more correct responses than incorrect ones
 
 ```
+
+
+
 ```{r}
 # Do it for the simulated data
 # Create the bar plot with the reordered data frame
-barplot(table(df_simulated_responses_07$correct, df_simulated_responses_07$trial), 
-        beside = TRUE, 
-        main = "Development of Responses Across Trials - Simulated Data", 
-        sub = "",
-        ylab = "Response Count",
-        xaxt = "t",
-        xlab = "Trial Number",
-        ylim = c(0,20),
-        border = NA)
-
-mtext("c = 0.7, w = optimal", side = 3, line = 0.3, cex = 1.1)
-
-# Add a legend
-legend("right", 
-       legend = c("Correct", "Incorrect"), 
-       fill = c("light grey", "black"),
-       xpd = TRUE)
-
-
-### Doing it for equal weights
-# Do it for the simulated data
-# Create the bar plot with the reordered data frame
-barplot(table(equal_simulated_responses_07$correct, equal_simulated_responses_07$trial), 
-        beside = TRUE, 
-        main = "Development of Responses Across Trials - Simulated Data", 
-        sub = "",
-        ylab = "Response Count",
-        xaxt = "t",
-        xlab = "Trial Number",
-        ylim = c(0,20),
-        border = NA)
-
-mtext("c = 0.7, w = equal", side = 3, line = 0.3, cex = 1.1)
-
-# Add a legend
-legend("right", 
-       legend = c("Correct", "Incorrect"), 
-       fill = c("light grey", "black"),
-       xpd = TRUE)
-
-#table(simulated_responses$correct) # we see that there are more correct responses than incorrect ones
-```
-```{r}
-# Do it for the simulated data
-# Create the bar plot with the reordered data frame
-barplot(table(df_simulated_responses_1.2$correct, df_simulated_responses_1.2$trial), 
+barplot(table(df_simulated_responses_2.2_optimal$correct, df_simulated_responses_2.2_optimal$trial), 
         beside = TRUE, 
         main = "Development of Responses Across Trials - Simulated Data", 
         sub = "",
@@ -177,7 +170,55 @@ barplot(table(df_simulated_responses_1.2$correct, df_simulated_responses_1.2$tri
         ylim = c(0,15),
         border = NA)
 
-mtext("c = 1.2", side = 3, line = 0.3, cex = 1.1)
+mtext("c = 2.2, w = optimal", side = 3, line = 0.3, cex = 1.1)
+
+# Add a legend
+legend("topright", 
+       legend = c("Correct", "Incorrect"), 
+       fill = c("light grey", "black"),
+       xpd = TRUE)
+
+
+### Doing it for equal weights
+# Do it for the simulated data
+# Create the bar plot with the reordered data frame
+barplot(table(df_simulated_responses_2.2_equal$correct, df_simulated_responses_2.2_equal$trial), 
+        beside = TRUE, 
+        main = "Development of Responses Across Trials - Simulated Data", 
+        sub = "",
+        ylab = "Response Count",
+        xaxt = "t",
+        xlab = "Trial Number",
+        ylim = c(0,15),
+        border = NA)
+
+mtext("c = 2.2, w = equal", side = 3, line = 0.3, cex = 1.1)
+
+# Add a legend
+legend("topright", 
+       legend = c("Correct", "Incorrect"), 
+       fill = c("light grey", "black"),
+       xpd = TRUE)
+
+#table(simulated_responses$correct) # we see that there are more correct responses than incorrect ones
+```
+
+
+# Simulated data but for different scaling factors
+```{r}
+# Do it for the simulated data
+# Create the bar plot with the reordered data frame
+barplot(table(df_simulated_responses_1.2_optimal$correct, df_simulated_responses_1.2_optimal$trial), 
+        beside = TRUE, 
+        main = "Development of Responses Across Trials - Simulated Data", 
+        sub = "",
+        ylab = "Response Count",
+        xaxt = "t",
+        xlab = "Trial Number",
+        ylim = c(0,15),
+        border = NA)
+
+mtext("c = 1.2, w = Optimal", side = 3, line = 0.3, cex = 1.1)
 
 # Add a legend
 legend("right", 
@@ -188,31 +229,8 @@ legend("right",
 
 #table(simulated_responses$correct) # we see that there are more correct responses than incorrect ones
 ```
-```{r}
-# Do it for the simulated data
-# Create the bar plot with the reordered data frame
-barplot(table(df_simulated_responses_1.2$correct, df_simulated_responses_1.2$trial), 
-        beside = TRUE, 
-        main = "Development of Responses Across Trials - Simulated Data - c = 1.2", 
-        ylab = "Response Count",
-        xaxt = "t",
-        xlab = "Trial Number",
-        ylim = c(0,20),
-        border = NA)
 
-# Add a legend
-legend("middle right", 
-       legend = c("Correct", "Incorrect"), 
-       fill = c("light grey", "black"),
-       xpd = TRUE,
-       x = "right",
-       y = max(par("usr")[4], par("usr")[3]) + 0.5)
-
-
-#table(simulated_responses$correct) # we see that there are more correct responses than incorrect ones
-```
-
-
+# Cumulative Performance Empirical data - per subject
 ```{r}
 
 df1 <- df1 %>%
@@ -222,16 +240,89 @@ ggplot(df1, aes(x = trial, y = performance, color = as.factor(subject))) +
   geom_line ()+
   facet_wrap(~ df1$subject) + 
   labs(x = "Trial", y = "Performance", color = "subject") + 
-  stat_summary(aes(group=1), fun.y=mean, geom="line", size = 1)
+  stat_summary(aes(group=1), fun.y=mean, geom="line", size = 1)+ ggtitle("Cumulative Performance Empirical Data - Per Subject")
+
+```
 
 
+```{r}
+# Plot - overlapping performance empirical data
 ggplot(df1, aes(x = trial, y = performance, color = as.factor(subject))) +
-  geom_line ()+
-  #facet_wrap(~ df1$subject) + 
-  labs(x = "Trial", y = "Performance", color = "subject") + 
-  stat_summary(aes(group=1), fun.y=mean, geom="line", size = 1) +
+  geom_line () +
+  #facet_wrap(~ df_simulated_responses$agent) + 
+  labs(x = "Trial", y = "Performance", color = "Agent") +
+  stat_summary(geom = "line", fun = "mean", color = "black", size = 1) +
   ggtitle("Cumulative Performance - Empirical Data")
 
 ```
+
+
+# Making the performance plots for all weight combinations inb simulated data
+
+#Optimal weights
+
+```{r}
+# Optimal weights, c= 0.7
+ggplot(df_simulated_responses_07_optimal, aes(x = trial, y = performance, color = as.factor(agent))) +
+  geom_line () + 
+  labs(x = "Trial", y = "Performance", color = "Agent") +
+  stat_summary(geom = "line", fun = "mean", color = "black", size = 1) +
+  ggtitle("Optimal Weights, c = 0.7")
+
+# Optimal weights, c= 1.2
+ggplot(df_simulated_responses_1.2_optimal, aes(x = trial, y = performance, color = as.factor(agent))) +
+  geom_line () + 
+  labs(x = "Trial", y = "Performance", color = "Agent") +
+  stat_summary(geom = "line", fun = "mean", color = "black", size = 1) +
+  ggtitle("Optimal Weights, c = 1.2")
+
+# Optimal weights, c= 1.7
+ggplot(df_simulated_responses_1.7_optimal, aes(x = trial, y = performance, color = as.factor(agent))) +
+  geom_line () + 
+  labs(x = "Trial", y = "Performance", color = "Agent") +
+  stat_summary(geom = "line", fun = "mean", color = "black", size = 1) +
+  ggtitle("Optimal Weights, c = 1.7")
+
+# Optimal weights, c= 2.2
+ggplot(df_simulated_responses_2.2_optimal, aes(x = trial, y = performance, color = as.factor(agent))) +
+  geom_line () + 
+  labs(x = "Trial", y = "Performance", color = "Agent") +
+  stat_summary(geom = "line", fun = "mean", color = "black", size = 1) +
+  ggtitle("Optimal Weights, c = 2.2")
+```
+
+
+#Equal weights
+
+```{r}
+# Equal weights, c= 0.2
+ggplot(df_simulated_responses_07_equal, aes(x = trial, y = performance, color = as.factor(agent))) +
+  geom_line () + 
+  labs(x = "Trial", y = "Performance", color = "Agent") +
+  stat_summary(geom = "line", fun = "mean", color = "black", size = 1) +
+  ggtitle("Equal Weights, c = 0.7")
+
+#  Equal weights, c= 1.2
+ggplot(df_simulated_responses_1.2_equal, aes(x = trial, y = performance, color = as.factor(agent))) +
+  geom_line () + 
+  labs(x = "Trial", y = "Performance", color = "Agent") +
+  stat_summary(geom = "line", fun = "mean", color = "black", size = 1) +
+  ggtitle("Equal Weights, c = 1.2")
+
+#  Equal weights, c= 1.7
+ggplot(df_simulated_responses_1.7_equal, aes(x = trial, y = performance, color = as.factor(agent))) +
+  geom_line () + 
+  labs(x = "Trial", y = "Performance", color = "Agent") +
+  stat_summary(geom = "line", fun = "mean", color = "black", size = 1) +
+  ggtitle("Equal Weights, c = 1.7")
+
+#  Equal weights, c= 2.2
+ggplot(df_simulated_responses_2.2_equal, aes(x = trial, y = performance, color = as.factor(agent))) +
+  geom_line () + 
+  labs(x = "Trial", y = "Performance", color = "Agent") +
+  stat_summary(geom = "line", fun = "mean", color = "black", size = 1) +
+  ggtitle("Equal Weights, c = 2.2")
+```
+
 
 ≈
