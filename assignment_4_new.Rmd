@@ -206,10 +206,10 @@ ggplot(df_simulated_responses, aes(x = trial, y = performance, color = as.factor
 **Fit Stan** 
 
 ```{r}
-n_agents = 2
+n_agents = 1
 
 for (i in 1:n_agents) {
-  d <- simulated_responses %>% subset(c == "1.2" & w == "optimal" & agent == 1)
+  d <- simulated_responses %>% subset(c == "1.7" & w == "optimal" & agent == 1)
   
   gcm_data <- list(
     ntrials = nrow(d),
@@ -284,55 +284,56 @@ gcm_data
 
 ```{r}
 
-draws_df_0.2 <- as_draws_df(samples_agent1_0.2_optimal$draws())
+draws_df_1.7 <- as_draws_df(samples$draws())
 
 #samples$summary()
 
-ggplot(draws_df_0.2) +
+ggplot(draws_df_1.7) +
   geom_density(aes(c), fill = "blue", alpha = 0.3) +
   geom_density(aes(c_prior), fill = "red", alpha = 0.3) +
   #geom_vline(xintercept = 0.2, linetype = "dashed", color = "black", size = 1.5) +
-  xlab("C_0.2") +
+  xlab("C = 1.7") +
   ylab("Posterior Density") +
   theme_classic()
 
 
-draws_df_0.7 <- as_draws_df(samples_agent1_0.7_optimal$draws())
+draws_df_1.7 <- draws_df_1.7 %>% 
+  rename (w_1 = "w[1]",
+         w_prior_1 = "w_prior[1]")
+
+draws_df_1.7 <- draws_df_1.7 %>% 
+  rename (w_2 = "w[2]",
+         w_prior_2 = "w_prior[2]")
+
 
 #samples$summary()
 
-ggplot(draws_df_0.7) +
-  geom_density(aes(c), fill = "blue", alpha = 0.3) +
-  geom_density(aes(c_prior), fill = "red", alpha = 0.3) +
+ggplot(draws_df_1.7) +
+  geom_density(aes(w_1), fill = "blue", alpha = 0.3) +
+  geom_density(aes(w_prior_1), fill = "red", alpha = 0.3) +
   #geom_vline(xintercept = 0.2, linetype = "dashed", color = "black", size = 1.5) +
-  xlab("C_0.7") +
+  xlab("Weight 1") +
   ylab("Posterior Density") +
   theme_classic()
 
 
-draws_df_0.2 <- as_draws_df(samples_agent1_0.2_optimal$draws())
-
-draws_df_0.2 <- draws_df_0.2 %>% 
-  rename (w_1 = "w[1]",
-         w_prior_1 = "w_prior[1]")
-
-
-draws_df_0.7 <- draws_df_0.7 %>% 
-  rename (w_1 = "w[1]",
-         w_prior_1 = "w_prior[1]")
-
-draws_df_0.7
-
-#samples$summary()
-
-ggplot(draws_df_0.7) +
+ggplot(draws_df_1.7) +
   geom_density(aes(w_2), fill = "blue", alpha = 0.3) +
-  geom_density(aes(w_1), fill = "red", alpha = 0.3) +
+  geom_density(aes(w_prior_2), fill = "red", alpha = 0.3) +
   #geom_vline(xintercept = 0.2, linetype = "dashed", color = "black", size = 1.5) +
   xlab("Weight 2") +
   ylab("Posterior Density") +
   theme_classic()
 
+
+ggplot(draws_df_1.7) +
+  geom_density(aes(w_1), fill = "orange", alpha = 0.3) +
+  geom_density(aes(w_2), fill = "green", alpha = 0.3) +
+  geom_density(aes(w_prior_1), color = "red") +
+  #geom_vline(xintercept = 0.2, linetype = "dashed", color = "black", size = 1.5) +
+  xlab("Weight 1 (orange), Weight 2 (green)") +
+  ylab("Posterior Density") +
+  theme_classic()
 
 ```
 
