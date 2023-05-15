@@ -131,7 +131,7 @@ gcm <- function(w, c, obs, cat_one, quiet = TRUE) {
 simulate_responses <- function(agent, w, c) {
     
     observations <- experiment %>%
-        select(c("arms", "spots", "eyes", "legs", "color"))
+        select(c("eyes", "legs", "spots", "arms", "color"))
     
     danger <- experiment$danger
     
@@ -139,7 +139,7 @@ simulate_responses <- function(agent, w, c) {
     if (w == "equal") { #equal weights for all features
         weight <- rep(0.2, 5)
     } else if (w == "optimal") { #only weighting the relevant features (spots and eyes)
-        weight <- c(0,0.5,0.5,0,0)
+        weight <- c(0.5, 0, 0.5, 0, 0)
     }
 
     # simulate responses
@@ -173,7 +173,7 @@ plan(multisession, workers = availableCores())
 param_df <- dplyr::tibble(
     expand_grid(
         agent = 1:10,
-        c = c(0.2, 0.7, 1.2), #sensitivity 
+        c = c(0.7, 1.2, 1.7), #sensitivity 
         w = c("equal", "optimal") #weights
     )
 )
@@ -209,14 +209,14 @@ ggplot(df_simulated_responses, aes(x = trial, y = performance, color = as.factor
 n_agents = 2
 
 for (i in 1:n_agents) {
-  d <- simulated_responses %>% subset(c == "0.2" & w == "optimal" & agent == 1)
+  d <- simulated_responses %>% subset(c == "1.2" & w == "optimal" & agent == 1)
   
   gcm_data <- list(
     ntrials = nrow(d),
     nfeatures = 5,
     cat_one = d$danger, # "true responses on a trial by trial basis"
     y = d$sim_response,
-    obs = as.matrix(d[, c("arms", "spots", "eyes", "legs", "color")]),
+    obs = as.matrix(d[, c("eyes", "legs", "spots", "arms", "color")]),
     b = 0.5,
     w_prior_values = c(1, 1, 1, 1, 1),
     c_prior_values = c(0, 1)
@@ -266,7 +266,7 @@ d <- simulated_responses %>% subset(c == "0.7" & w == "optimal")
     nfeatures = 5,
     cat_one = d$danger, # "true responses on a trial by trial basis"
     y = d$sim_response,
-    selected_cols = c("arms", "spots", "eyes", "legs", "color"),
+    selected_cols = c("eyes", "legs", "spots", "arms", "color"),
     obs = as.matrix(d[, selected_cols]),
     b = 0.5,
     w_prior_values = c(1, 1, 1, 1, 1),
@@ -316,15 +316,20 @@ draws_df_0.2 <- draws_df_0.2 %>%
   rename (w_1 = "w[1]",
          w_prior_1 = "w_prior[1]")
 
-draws_df_0.2
+
+draws_df_0.7 <- draws_df_0.7 %>% 
+  rename (w_1 = "w[1]",
+         w_prior_1 = "w_prior[1]")
+
+draws_df_0.7
 
 #samples$summary()
 
-ggplot(draws_df_0.2) +
-  geom_density(aes(w_1), fill = "blue", alpha = 0.3) +
-  geom_density(aes(w_prior_1), fill = "red", alpha = 0.3) +
+ggplot(draws_df_0.7) +
+  geom_density(aes(w_2), fill = "blue", alpha = 0.3) +
+  geom_density(aes(w_1), fill = "red", alpha = 0.3) +
   #geom_vline(xintercept = 0.2, linetype = "dashed", color = "black", size = 1.5) +
-  xlab("Weight 1") +
+  xlab("Weight 2") +
   ylab("Posterior Density") +
   theme_classic()
 
