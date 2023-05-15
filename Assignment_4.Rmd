@@ -372,7 +372,7 @@ for (i in 1:length(subjectlist)) {
     c_prior_values = c(0, 1)
   )
     
-  mod_GCM <- cmdstan_model("gcm.stan", cpp_options = list(stan_threads = TRUE), stanc_options = list("O1"))
+  mod_GCM <- cmdstan_model("gcm_empirical.stan", cpp_options = list(stan_threads = TRUE), stanc_options = list("O1"))
     
   samples <- mod_GCM$sample(
     data = gcm_data, # the data :-)
